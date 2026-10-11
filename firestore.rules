@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default Deny All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidId(userId)
+        && incoming().id == userId
+        && incoming().displayName is string && incoming().displayName.size() <= 100
+        && incoming().email is string && incoming().email.size() <= 254
+        && incoming().createdAt is string
+        && incoming().updatedAt is string;
+      allow update: if isOwner(userId)
+        && incoming().id == existing().id
+        && incoming().displayName is string && incoming().displayName.size() <= 100
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt is string;
+      allow delete: if isOwner(userId);
+
+      // User Preferences Subcollection
+      match /preferences/settings {
+        allow get, update, create, delete: if isOwner(userId);
+      }
+
+      // Conversations Subcollection
+      match /conversations/{conversationId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(conversationId)
+          && incoming().userId == userId
+          && incoming().title is string && incoming().title.size() <= 200
+          && incoming().createdAt is string
+          && incoming().updatedAt is string;
+        allow update: if isOwner(userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().title is string && incoming().title.size() <= 200
+          && incoming().updatedAt is string;
+        allow delete: if isOwner(userId);
+
+        // Messages inside Conversation
+        match /messages/{messageId} {
+          allow get, list: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidId(messageId)
+            && incoming().conversationId == conversationId
+            && incoming().userId == userId
+            && incoming().role in ['user', 'assistant', 'system']
+            && incoming().content is string && incoming().content.size() <= 50000
+            && incoming().createdAt is string;
+          allow update: if isOwner(userId)
+            && incoming().conversationId == existing().conversationId
+            && incoming().userId == existing().userId
+            && incoming().createdAt == existing().createdAt;
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      // Starred Items Subcollection
+      match /starred/{starredId} {
+        allow get, list, create, delete: if isOwner(userId) && isValidId(starredId);
+      }
+
+      // Generated Images Subcollection
+      match /images/{imageId} {
+        allow get, list, create, delete: if isOwner(userId) && isValidId(imageId);
+      }
+
+      // Personal Memory Subcollection
+      match /memories/{memoryId} {
+        allow get, list, create, update, delete: if isOwner(userId) && isValidId(memoryId);
+      }
+    }
+  }
+}

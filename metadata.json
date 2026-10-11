@@ -1,0 +1,8 @@
+{
+  "name": "NOVA AI",
+  "description": "NOVA AI — Your Personal Intelligent AI Assistant with multi-turn chat, voice interaction, memory, image generation, and translation.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
